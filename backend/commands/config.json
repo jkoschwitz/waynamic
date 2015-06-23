@@ -1,6 +1,6 @@
 {
   "create": {
-    "users": 100,
+    "userLimit": 100,
     "randomEdges": 1,
     "connectivityProbability": 0.2
   },

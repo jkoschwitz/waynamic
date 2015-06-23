@@ -75,7 +75,7 @@ createSomeUsers = (n, k, p, fn) ->
 ### actual command ###
 Create.run = (userCount) ->
   # import parameters for the algorithm
-  n = config.create.users #how many user nodes should be created?
+  n = config.create.userLimit
   k = config.create.randomEdges
   p = config.create.connectivityProbability
 
