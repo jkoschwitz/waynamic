@@ -2,7 +2,7 @@
 Clear = exports? and exports or @Clear = {}
 
 neo4j = require "neo4j"
-db = new neo4j.GraphDatabase 'http://localhost:7474'
+db = new neo4j.GraphDatabase 'http://neo4j:waynamic@localhost:7474'
 
 ### actual command ###
 Clear.run = (user=20, complexity=0.5) ->

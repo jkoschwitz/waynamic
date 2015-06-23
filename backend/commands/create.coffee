@@ -5,7 +5,7 @@ Create = exports? and exports or @Create = {}
 _ = require "underscore"
 async = require "async"
 neo4j = require "neo4j"
-db = new neo4j.GraphDatabase 'http://localhost:7474'
+db = new neo4j.GraphDatabase url: 'http://neo4j:waynamic@localhost:7474'
 dict = require "./dictionary.json"
 config = require "./config.json"
 

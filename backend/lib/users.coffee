@@ -2,7 +2,7 @@ Users = exports? and exports or @Users = {}
 
 _ = require 'underscore'
 neo4j = require 'neo4j'
-db = new neo4j.GraphDatabase 'http://localhost:7474'
+db = new neo4j.GraphDatabase 'http://neo4j:waynamic@localhost:7474'
 
 Users.all = (cb) ->
   db.query """
