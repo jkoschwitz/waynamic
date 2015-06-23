@@ -5,17 +5,20 @@ neo4j = require 'neo4j'
 db = new neo4j.GraphDatabase 'http://neo4j:waynamic@localhost:7474'
 
 Pictures.all = (cb) ->
-  db.query """
+  query =
+    """
     MATCH (Picture:Picture)-->(Tag:`dc:keyword`)
     RETURN
       id(Picture) AS _id,
       Picture.url AS url,
       Picture.title AS title,
       collect(Tag.name) AS tags;
-  """, cb
+    """
+  db.cypher query:query, cb
 
 Pictures.random = (limit, cb) ->
-  db.query """
+  query =
+    """
     MATCH (Picture:Picture)
     OPTIONAL MATCH (Picture:Picture)<--(User:User)
     WITH DISTINCT Picture, count(User) AS used
@@ -30,7 +33,11 @@ Pictures.random = (limit, cb) ->
       Picture.title AS title,
       collect(Tag.name) AS tags
     LIMIT {limit};
-  """, limit:limit, prelimit:2*limit+100, (err, pictures) ->
+    """
+  params =
+    limit:limit
+    prelimit:2*limit+100
+  db.cypher query:query, params:params, (err, pictures) ->
     if err
       console.log "ERROR in pictures.coffee Pictures.random: #{err.message}"
       return cb null, {}
@@ -38,7 +45,8 @@ Pictures.random = (limit, cb) ->
       return cb err, pictures
 
 Pictures.one = (_id, cb) ->
-  db.query """
+  query =
+    """
     START Picture = node({pictureID})
     WHERE labels(Picture) = ['Picture']
     WITH Picture
@@ -48,15 +56,17 @@ Pictures.one = (_id, cb) ->
       Picture.url AS url,
       Picture.title AS title,
       collect(Tag.name) AS tags;
-  """, pictureID:parseInt(_id), (err, picture) ->
+    """
+  params = pictureID:parseInt(_id)
+  db.cypher query:query, params:params, (err, picture) ->
     if err
       console.log "ERROR in pictures.coffee Pictures.one: #{err.message}"
       return cb null, {}
     return cb null, picture[0]
 
 Pictures.add = (picture, cb) ->
-  params =
-  db.query """
+  query =
+    """
     MERGE (Picture:Picture {url:{url}})
     ON CREATE
       SET Picture.title = {title}, Picture.created = timestamp(), Picture.new = 1
@@ -66,15 +76,20 @@ Pictures.add = (picture, cb) ->
         MERGE (Tag:`dc:keyword` {name: tagname})
         MERGE (Picture)-[:metatag]->(Tag)
       REMOVE Picture.new
-  """, _.pick( picture, 'url', 'title', 'tags' ), cb
+    """
+  params = _.pick picture, 'url', 'title', 'tags'
+  db.cypher query:query, params:params, cb
 
 Pictures.get_id = (picture, cb) ->
-  db.query """
+  query =
+    """
     MATCH (Picture:Picture {url:{url}})-->(Tag:`dc:keyword`)
     RETURN
       id(Picture) AS _id,
       Picture.url AS url,
       Picture.title AS title,
       collect(Tag.name) AS tags;
-  """, url:picture.url, cb
+    """
+  params = url:picture.url
+  db.cypher query:query, params:params, cb
 

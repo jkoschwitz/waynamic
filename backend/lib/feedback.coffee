@@ -4,7 +4,7 @@ neo4j = require 'neo4j'
 db = new neo4j.GraphDatabase 'http://neo4j:waynamic@localhost:7474'
 
 Feedback.clear = (cb) ->
-  db.query "MATCH (:User)-[r:like|dislike|`foaf:interest`]->() DELETE r", cb
+  db.cypher query:"MATCH (:User)-[r:like|dislike|`foaf:interest`]->() DELETE r", cb
 
 Feedback.click = (userID, mediaID, cb) ->
   rating = +1
@@ -17,8 +17,9 @@ Feedback.ignore = (userID, mediaID, cb) ->
 
 Feedback.feedback = (userID, mediaID, rating, ratingtype, cb) ->
   throw new Error "no callback defined" unless cb
-  db.query "START item=node({id}) RETURN labels(item) AS mediatype;"
-  , id:mediaID, (err, mediatype) ->
+  query = "START item=node({id}) RETURN labels(item) AS mediatype;"
+  params = id:mediaID
+  db.cypher query:query, params:params, (err, mediatype) ->
     if err
       console.log "ERROR in feedback.coffee Feedback.feedback: #{err.message}"
       return cb null
@@ -30,8 +31,8 @@ Feedback.feedback = (userID, mediaID, rating, ratingtype, cb) ->
     fn userID, mediaID, rating, ratingtype, cb
 
 Picture = (userID, pictureID, rating, ratingtype, cb) ->
-  params = userID: userID, pictureID:pictureID, rating:rating
-  if ratingtype is "like" then cypher = """
+  if ratingtype is "like" then query =
+    """
     START User=node({userID}), Picture=node({pictureID})
     MERGE (User)-[l:like]->(Picture)
     ON CREATE SET
@@ -53,7 +54,8 @@ Picture = (userID, pictureID, rating, ratingtype, cb) ->
       i.updated = timestamp(),
       i.like = i.like + {rating};
     """
-  else if ratingtype is "dislike" then cypher = """
+  else if ratingtype is "dislike" then query =
+    """
     START User=node({userID}), Picture=node({pictureID})
     MERGE (User)-[d:dislike]->(Picture)
     ON CREATE SET
@@ -75,7 +77,11 @@ Picture = (userID, pictureID, rating, ratingtype, cb) ->
       i.updated = timestamp(),
       i.dislike = i.dislike + {rating};
     """
-  db.query cypher, params, cb
+  params =
+    userID: userID
+    pictureID:pictureID
+    rating:rating
+  db.cypher query:query, params:params, cb
 
 
 

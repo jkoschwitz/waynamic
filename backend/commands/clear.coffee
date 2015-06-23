@@ -7,12 +7,12 @@ db = new neo4j.GraphDatabase 'http://neo4j:waynamic@localhost:7474'
 ### actual command ###
 Clear.run = ->
   console.log "deleting database..."
-  cypher = """
+  query = """
     MATCH (n)
     OPTIONAL MATCH (n)-[r]-()
     DELETE r,n;
-  """
-  db.query cypher, {}, () ->
+    """
+  db.cypher query:query, ->
     console.log "database CLEAR!"
 
 ### when started directly as script ###
