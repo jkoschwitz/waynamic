@@ -8,16 +8,16 @@ db = new neo4j.GraphDatabase 'http://localhost:7474'
 Users = require '../lib/users'
 Pictures = require '../lib/pictures'
 Feedback = require '../lib/feedback'
-Stopwatch = require '../lib/stopwatch'
+TimeKeeper = require '../lib/timekeeper'
 
 clearInterests = (cb) ->
-  Stopwatch.start "clear interests"
+  TimeKeeper.start "clear interests"
   Feedback.clear ->
-    Stopwatch.stop "clear interests"
+    TimeKeeper.stop "clear interests"
     cb arguments...
 
 createInterests = (amount) ->
-  Stopwatch.start "create interests (trainingset)"
+  TimeKeeper.start "create interests (trainingset)"
   Users.all (err, users) ->
     async.eachSeries users, (user, done) ->
       Pictures.random amount, (err, pictures) ->
@@ -26,7 +26,7 @@ createInterests = (amount) ->
             console.log "ERROR: #{err}" if err
             do done
         , -> do done
-    , -> Stopwatch.stop "create interests (trainingset)"
+    , -> TimeKeeper.stop "create interests (trainingset)"
 
 CreateInterests.run = ->
   async.series
