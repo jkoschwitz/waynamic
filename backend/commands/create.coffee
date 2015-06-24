@@ -14,7 +14,7 @@ userCache = []
 
 getRandomExistingUser = (currentUser) ->
   if userCache.length > 1
-    list = _.filter userCache, (u) -> u.id isnt currentUser?.id
+    list = _.filter userCache, (u) -> u._id isnt currentUser?._id
     i = _.random(0, list.length - 1)
     return userCache[ i ]
   else
