@@ -29,49 +29,61 @@ user.interests = (req, res, next) ->
   query =
     """
     START User=node({userID})
-    MATCH (User)-[i:`foaf:interest`]->(Metatag)
-    WHERE (Metatag)<--(:#{req.type})
+    MATCH (User)-[i:`foaf:interest`]->(Metadata)
+    WHERE (Metadata)<--(:#{req.type})
       and i.like > 0
-    RETURN labels(Metatag)[0] AS metatype, Metatag.name AS name, i.like AS like, i.dislike AS dislikes
+    RETURN
+      labels(Metadata)[0] AS metatype,
+      Metadata.name AS name,
+      i.like AS like,
+      i.dislike AS dislikes
     ORDER BY like DESC;
     """
   params = userID:req.user
-  db.cypher query:query, params:params, (err, result) ->
-    interests = _.groupBy result, (meta) -> meta.metatype
+  db.cypher query:query, params:params, (err, interests) ->
+
+    # group by type of metadata (for now only `keyword` of `picture`)
+    # and handle each type for its own
+    interests = _.groupBy interests, (interest) -> interest.metatype
     for metatype, metataglist of interests
+
+      # calculate normalized interestlevel
       max = metataglist[0].like * 1.0
       max = 1.0 if max is 0
       metataglist = _.map metataglist, (metatag) ->
-        # normalize by likes
-        metatag.like /= max
-        metatag.dislikes /= max
         # relevance dislikes
         metatag.dislikes *= req.dislike_fac
         # combine like and disklike
         metatag.like = metatag.like * metatag.like / (metatag.like + metatag.dislikes)
+        # normalize
+        metatag.like /= max
         # sanitize
         delete metatag.metatype
         delete metatag.dislikes
-        metatag
+        return metatag
+
+      # sort and write back
       metataglist = _.sortBy metataglist, (metatag) -> - metatag.like
       metataglist = metataglist[0...50]
       interests[metatype] = metataglist
+
     req.interests = interests
-    # console.log interests
     next req, res
 
 # The Friends from a user: req.user as a Scatter
 user.sfriends = (req, res, next) ->
+
+  console.log "User: ", req.user
   query =
     """
     START User=node({userID})
     MATCH (User)-[:`foaf:knows`]->(Friends)
     RETURN
-      DISTINCT id(Friends) AS _id
-      Friends.firstName AS firstName
+      DISTINCT id(Friends) AS _id,
+      Friends.firstName AS firstName,
       Friends.lastName AS lastName
     """
-  params = userID:req.user
+  params = userID:req.user # todo: rename to user_id later
   db.cypher query:query, params:params, (err, friends) ->
     reqres = []
     if friends.length is 0
@@ -90,7 +102,6 @@ user.sfriends = (req, res, next) ->
         reqres.push nreq
 
     reqres.push res
-    console.log friends
     next.apply @, reqres
 
 # The Activities from a user: req.user
@@ -127,7 +138,6 @@ user.activities = (req, res, next) ->
       like.rating /= max
 
     req.activities = likes
-    # console.log req.activities
     next req, res
 
 

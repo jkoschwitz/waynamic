@@ -10,8 +10,8 @@ MicroService = require('micros').MicroService
 ms = new MicroService 'extend'
 ms.$set 'api', 'ws'
 
-# Extends the result with additional items throught the social graph: req.interests
-# for now dc:keyword only
+# Extends the result with additional items by content based filtering
+# for now only `keyword` of `picture`
 extend = (req, res, next) ->
   req.count_cb += req.count_sb - res.length
   query =
@@ -22,7 +22,10 @@ extend = (req, res, next) ->
           and i.like > 0
     WITH DISTINCT Mediaitem, sum(i.like * i.like / ({dislike_fac}*i.dislike + i.like)) AS interests
     ORDER BY interests DESC
-    RETURN DISTINCT id(Mediaitem) AS _id, Mediaitem.url AS url, 'Passend zu Ihren Interessen' AS subtitle
+    RETURN
+      DISTINCT id(Mediaitem) AS _id,
+      Mediaitem.url AS url,
+      'Passend zu Ihren Interessen' AS subtitle
     LIMIT {limit}
     """
   params =

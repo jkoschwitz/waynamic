@@ -19,7 +19,7 @@ activity = (req, res, next) ->
 # Filters all Activities from friends with the interest profile
 activity.filter = (req, res, next) ->
   req.recos = []
-  interests = req.interests['dc:keyword']
+  interests = req.interests['dc:keyword'] # todo
   for item in req.activities
     # Filter elements throgh interests and key word clouds
     correlation = interests.reduce( (akk, interest) ->
