@@ -147,7 +147,7 @@ app.get '/users/:id/profile', (req, res) ->
 
 # --- recommendation routes ----------------------------------------------------
 
-# expects response of GET /user/:id/pictures += clicked:_id
+# expects response of GET /users/:id/pictures += clicked:_id
 app.post '/users/:id/pictures', (req, res) ->
   picIDs = _.map (_.union req.body.recommendations, req.body.trainingset), (pic) -> pic._id
   userID = parseInt req.params.id
