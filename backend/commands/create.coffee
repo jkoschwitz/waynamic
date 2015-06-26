@@ -21,7 +21,8 @@ getRandomExistingUser = (currentUser) ->
     return null
 
 createUserNode = (cb) ->
-  query = """
+  query =
+    """
     CREATE (u:User {properties})
     SET u.createdAt = timestamp()
     RETURN u
@@ -36,50 +37,58 @@ createUserNode = (cb) ->
     # user.index "User", "id", user.id, ->
     userCache.push user
     target = getRandomExistingUser(user)
-    if target
-      user.createRelationshipTo target, "faof:knows", {}, cb
-    else
-      cb? null, false
+    connectUsers user, target, ->
+      cb err, user # do never return created relationship – but return user
 
-createRandomEdge = (cb) ->
-  u1 = getRandomExistingUser()
-  u2 = getRandomExistingUser u1
-  if u1 and u2
-    u1.createRelationshipTo u2, "foaf:knows", {}, cb
-  else
-    cb? null, false
+#--- relationships -------------------------------------------------------------
+connectUsers = (user1, user2, cb) ->
+  return cb? null, false unless user1? and user2?
+  query =
+    """
+    START User1=node({fromID}), User2=node({toID})
+    MERGE (User1)-[knows:`foaf:knows`]->(User2)
+    RETURN knows;
+    """
+  params =
+    fromID: user1._id
+    toID: user2._id
+  db.cypher query:query, params:params, cb
 
-createSomeEdges = (k, cb) ->
+createSomeRandomEdges = (k, cb) ->
   async.timesSeries k, ((iterator, next) ->
-    createRandomEdge (err, edge) -> next(err, edge)
+    u1 = getRandomExistingUser()
+    u2 = getRandomExistingUser u1
+    connectUsers u1, u2, (err, edge) -> next(err, edge)
   ), cb
 
+# connects for each iteration …………………
 connectNeighbors = (p, cb) ->
-  query = """
+  query = # here be dragons: the original code matches only triangle relationships with the first user
+    """
     START a=node(*)
     MATCH (a:User)-->(b:User)--(c:User)
-    WHERE NOT (a)--(c)
-    RETURN a, c LIMIT 10';
+    WHERE NOT (a)--(c) AND NOT a = c
+    RETURN a, c LIMIT 10;
     """ # limiting triangle connection possibilities to achieve linear runtime. Remove the limit for more accurate results
   db.cypher query:query, (err, pairs) ->
-    async.each pairs, ((pair, callback) ->
+    async.each pairs, ((pair, cb) ->
       if Math.random() <= p
         {a, c} = pair
-        a.createRelationshipTo c, "foaf:knows", {}, callback
+        connectUsers a, c, cb
       else
-        callback null
+        cb null
     ), cb
 
 createSomeUsers = (n, k, p, cb) ->
   async.timesSeries n, (iterator, next) ->
     console.log "iteration: ", iterator, n
     createUserNode (err, user) ->
-      createSomeEdges k, (err, edges) ->
+      createSomeRandomEdges k, (err, edges) ->
         connectNeighbors p, ->
           next err, user
   , cb
 
-### actual command ###
+#--- actual command ------------------------------------------------------------
 Create.run = (userCount) ->
   # import parameters for the algorithm
   n = config.create.userLimit
@@ -97,6 +106,6 @@ Create.run = (userCount) ->
     else
       console.log ">>> Created #{n} Users."
 
-### when started directly as script ###
+#--- when started directly as script -------------------------------------------
 if process.argv[1] is __filename
   Create.run()
