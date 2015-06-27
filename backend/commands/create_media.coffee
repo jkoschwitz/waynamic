@@ -13,7 +13,7 @@ createPictures = (limit, cb) ->
   Flickr.cache limit:limit, (err, pictures) ->
     TimeKeeper.stop 'load media'
     TimeKeeper.start 'save media'
-    async.eachLimit pictures, 1, Pictures.add, ->
+    async.eachLimit pictures, 1, Pictures.add, (err) ->
       TimeKeeper.stop 'save media'
       cb arguments...
 

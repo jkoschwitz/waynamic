@@ -19,17 +19,17 @@ activity = (req, res, next) ->
 # Filters all Activities from friends with the interest profile
 activity.filter = (req, res, next) ->
   req.recos = []
-  interests = req.interests['dc:keyword'] # todo
+  interests = req.interests.keyword
   for item in req.activities
     # Filter elements throgh interests and key word clouds
     correlation = interests.reduce( (akk, interest) ->
-      if _.contains item.metatags, interest.name
+      if _.contains item.metadata_name, interest.metadata_name
         # A stronger weight on postive likes ageinst negativ feedback or unknown items
         akk += (interest.like * interest.like)
       else akk
     , 0)
     req.recos.push({
-      item: _.pick item, ['url', 'title', 'rating', '_id']
+      item: _.pick item, 'url', 'title', 'rating', '_id'
       prediction: correlation
     }) if correlation >= qc
 

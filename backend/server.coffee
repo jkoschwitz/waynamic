@@ -116,30 +116,30 @@ reco = user.interests -> user.sfriends -> filter -> fit -> router.finish
 
 # --- user routes --------------------------------------------------------------
 
-# sanitizeUser = (obj) -> _.pick(obj, "_id", "firstName", "lastName", "createdAt", "nodeId")
+# sanitizeUser = (obj) -> _.pick obj, '_id', 'firstName', 'lastName', 'createdAt', 'nodeId'
 # auth = (req, res, next) -> if req.isAuthenticated() then next() else res.send 401
 
-# app.get  "/loggedin", auth, (req, res) -> res.json sanitizeUser req.user
-# app.post "/login", passport.authenticate('local'), (req, res) -> res.json sanitizeUser req.user
-# app.post "/logout", auth, (req, res) -> req.logout(); req.session = null; res.send 200
-# app.get "/test", (req, res) -> res.json req.user
+# app.get  '/loggedin', auth, (req, res) -> res.json sanitizeUser req.user
+# app.post '/login', passport.authenticate('local'), (req, res) -> res.json sanitizeUser req.user
+# app.post '/logout', auth, (req, res) -> req.logout(); req.session = null; res.send 200
+# app.get '/test', (req, res) -> res.json req.user
 
 app.get '/users', (req, res) ->
   Users.all (err, result) ->
     return res.end err.message if err
     return res.json result
 
-app.get '/users/:id', (req, res) ->
-  Users.one req.params.id, (err, result) ->
+app.get '/users/:user_id', (req, res) ->
+  Users.one req.params.user_id, (err, result) ->
     return res.end err.message if err
     return res.json result
 
-app.get '/users/:id/profile', (req, res) ->
+app.get '/users/:user_id/profile', (req, res) ->
   async.series
     history: (cb) ->
-      Users.history req.params.id, 'Picture', cb
+      Users.history req.params.user_id, 'picture', cb
     friends: (cb) ->
-      Users.friends req.params.id, cb
+      Users.friends req.params.user_id, cb
     , (err, all) ->
       res.json all
 
@@ -147,16 +147,16 @@ app.get '/users/:id/profile', (req, res) ->
 
 # --- recommendation routes ----------------------------------------------------
 
-# expects response of GET /users/:id/pictures += clicked:_id
-app.post '/users/:id/pictures', (req, res) ->
+# expects response of GET /users/:user_id/pictures += clicked:_id
+app.post '/users/:user_id/pictures', (req, res) ->
   picIDs = _.map (_.union req.body.recommendations, req.body.trainingset), (pic) -> pic._id
-  userID = parseInt req.params.id
+  user_id = parseInt req.params.user_id
   click = req.body.clicked
   ignores = _.filter picIDs, (_id) -> _id isnt click
-  Feedback.click userID, click, (err) ->
+  Feedback.click user_id, click, (err) ->
     console.log err.message if err
     async.eachSeries ignores, (ignore, done) ->
-      Feedback.ignore userID, ignore, (err) ->
+      Feedback.ignore user_id, ignore, (err) ->
         console.log err.message if err
         do done
     , ->
@@ -164,8 +164,8 @@ app.post '/users/:id/pictures', (req, res) ->
       return res.redirect ".?_id=#{click}"
 
 # http://localhost:4343/users/155040/pictures?_id=203828
-app.get '/users/:id/pictures', (req, res) ->
-  Users.one req.params.id, (err, user) ->
+app.get '/users/:user_id/pictures', (req, res) ->
+  Users.one req.params.user_id, (err, user) ->
     if user._id?
       count_sb = 6 # social based
       count_cb = 2 # content based (up to 8 if social based returns too little results)
@@ -178,6 +178,7 @@ app.get '/users/:id/pictures', (req, res) ->
       current: (cb) ->
         return cb null, {} unless req.query._id
         Pictures.one req.query._id, (err, picture) ->
+          picture = _.pick picture, '_id', 'url'
           # picture.url = picture.url.replace /\.jpg$/, '_b.jpg'
           cb err, picture
       recommendations: (cb) ->
@@ -187,8 +188,8 @@ app.get '/users/:id/pictures', (req, res) ->
           # Register Callback
           request = router.$register req, (recommendations) -> cb null, recommendations
           # Set request paramezers
-          request.user = user._id                                 # id
-          request.type = 'Picture'                                # Picture
+          request.user_id = user._id
+          request.type = 'picture'                                # picture
           request.count_sb = count_sb                             # number of social based recommednations
           request.count_cb = count_cb                             # number of content based recommednations
           request.context = req.query._id if req.query.__dirname  # The recommendation context
@@ -221,7 +222,7 @@ app.get '/pictures', (req, res) ->
       res.json {}
     else
       Flickr.cache.add pictures
-      async.eachLimit pictures, 1, Pictures.add, ->
+      async.eachLimit pictures, 1, Pictures.add, (err) ->
         return res.json pictures
 
 # query:  http://localhost:4343/pictures/hot
@@ -239,7 +240,7 @@ app.get '/pictures/hot', (req, res) ->
       res.json {}
     else
       Flickr.cache.add pictures
-      async.eachLimit pictures, 1, Pictures.add, ->
+      async.eachLimit pictures, 1, Pictures.add, (err) ->
         res.json trainingset: pictures
 
 # query:  http://localhost:4343/videos?term=coffeescript

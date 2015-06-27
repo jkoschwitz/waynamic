@@ -7,31 +7,31 @@ db = new neo4j.GraphDatabase 'http://neo4j:waynamic@localhost:7474'
 Pictures.all = (cb) ->
   query =
     """
-    MATCH (Picture:Picture)-->(Tag:`dc:keyword`)
+    MATCH (picture:picture)-->(keyword:keyword)
     RETURN
-      id(Picture) AS _id,
-      Picture.url AS url,
-      Picture.title AS title,
-      collect(Tag.name) AS tags;
+      id(picture) AS _id,
+      picture.url AS url,
+      picture.title AS title,
+      collect(keyword.name) AS keywords;
     """
   db.cypher query:query, cb
 
 Pictures.random = (limit, cb) ->
   query =
     """
-    MATCH (Picture:Picture)
-    OPTIONAL MATCH (Picture:Picture)<--(User:User)
-    WITH DISTINCT Picture, count(User) AS used
+    MATCH (picture:picture)
+    OPTIONAL MATCH (picture:picture)<--(user:user)
+    WITH DISTINCT picture, count(user) AS used
     ORDER BY used ASC
     LIMIT {prelimit}
-    WITH Picture, rand() AS rand
+    WITH picture, rand() AS rand
     ORDER BY rand
-    MATCH (Picture)-->(Tag:`dc:keyword`)
+    MATCH (picture)-->(keyword:keyword)
     RETURN
-      id(Picture) AS _id,
-      Picture.url AS url,
-      Picture.title AS title,
-      collect(Tag.name) AS tags
+      id(picture) AS _id,
+      picture.url AS url,
+      picture.title AS title,
+      collect(keyword.name) AS keywords
     LIMIT {limit};
     """
   params =
@@ -47,17 +47,17 @@ Pictures.random = (limit, cb) ->
 Pictures.one = (_id, cb) ->
   query =
     """
-    START Picture = node({pictureID})
-    WHERE labels(Picture) = ['Picture']
-    WITH Picture
-    MATCH (Picture)-->(Tag:`dc:keyword`)
+    START picture = node({picture_id})
+    WHERE labels(picture) = ['picture']
+    WITH picture
+    MATCH (picture)-->(keyword:keyword)
     RETURN
-      id(Picture) AS _id,
-      Picture.url AS url,
-      Picture.title AS title,
-      collect(Tag.name) AS tags;
+      id(picture) AS _id,
+      picture.url AS url,
+      picture.title AS title,
+      collect(keyword.name) AS keywords;
     """
-  params = pictureID:parseInt(_id)
+  params = picture_id:parseInt(_id)
   db.cypher query:query, params:params, (err, picture) ->
     if err
       console.log "ERROR in pictures.coffee Pictures.one: #{err.message}"
@@ -67,28 +67,28 @@ Pictures.one = (_id, cb) ->
 Pictures.add = (picture, cb) ->
   query =
     """
-    MERGE (Picture:Picture {url:{url}})
+    MERGE (picture:picture {url:{url}})
     ON CREATE
-      SET Picture.title = {title}, Picture.created = timestamp(), Picture.new = 1
-      WITH Picture
-      WHERE Picture.new = 1
-      UNWIND {tags} AS tagname
-        MERGE (Tag:`dc:keyword` {name: tagname})
-        MERGE (Picture)-[:metatag]->(Tag)
-      REMOVE Picture.new
+      SET picture.title = {title}, picture.created = timestamp(), picture.new = 1
+      WITH picture
+      WHERE picture.new = 1
+      UNWIND {keywords} AS keyword_name
+        MERGE (keyword:keyword {name: keyword_name})
+        MERGE (picture)-[:metadata]->(keyword)
+      REMOVE picture.new;
     """
-  params = _.pick picture, 'url', 'title', 'tags'
+  params = _.pick picture, 'url', 'title', 'keywords'
   db.cypher query:query, params:params, cb
 
 Pictures.get_id = (picture, cb) ->
   query =
     """
-    MATCH (Picture:Picture {url:{url}})-->(Tag:`dc:keyword`)
+    MATCH (picture:picture {url:{url}})-->(keyword:keyword)
     RETURN
-      id(Picture) AS _id,
-      Picture.url AS url,
-      Picture.title AS title,
-      collect(Tag.name) AS tags;
+      id(picture) AS _id,
+      picture.url AS url,
+      picture.title AS title,
+      collect(keyword.name) AS keywords;
     """
   params = url:picture.url
   db.cypher query:query, params:params, cb

@@ -23,9 +23,9 @@ getRandomExistingUser = (currentUser) ->
 createUserNode = (cb) ->
   query =
     """
-    CREATE (u:User {properties})
-    SET u.createdAt = timestamp()
-    RETURN u
+    CREATE (user:user {properties})
+    SET user.createdAt = timestamp()
+    RETURN user
     """
   params =
     properties:
@@ -33,8 +33,8 @@ createUserNode = (cb) ->
       lastName: dict.lastNames[ _.random(0,dict.lastNames.length) ] # last names: http://www.census.gov/genealogy/www/data/1990surnames/dist.all.last
       age: _.random(16,70)
   db.cypher query:query, params:params, (err, nodes) ->
-    user = nodes[0].u
-    # user.index "User", "id", user.id, ->
+    user = nodes[0].user
+    # user.index "user", "_id", user._id, ->
     userCache.push user
     target = getRandomExistingUser(user)
     connectUsers user, target, ->
@@ -45,13 +45,13 @@ connectUsers = (user1, user2, cb) ->
   return cb? null, false unless user1? and user2?
   query =
     """
-    START User1=node({fromID}), User2=node({toID})
-    MERGE (User1)-[knows:`foaf:knows`]->(User2)
+    START user1=node({from_id}), user2=node({to_id})
+    MERGE (user1)-[knows:knows]->(user2)
     RETURN knows;
     """
   params =
-    fromID: user1._id
-    toID: user2._id
+    from_id: user1._id
+    to_id: user2._id
   db.cypher query:query, params:params, cb
 
 createSomeRandomEdges = (k, cb) ->
@@ -66,7 +66,7 @@ connectNeighbors = (p, cb) ->
   query = # here be dragons: the original code matches only triangle relationships with the first user
     """
     START a=node(*)
-    MATCH (a:User)-->(b:User)--(c:User)
+    MATCH (a:user)-->(b:user)--(c:user)
     WHERE NOT (a)--(c) AND NOT a = c
     RETURN a, c LIMIT 10;
     """ # limiting triangle connection possibilities to achieve linear runtime. Remove the limit for more accurate results
@@ -95,9 +95,9 @@ Create.run = (userCount) ->
   k = config.create.randomEdges
   p = config.create.connectivityProbability
 
-  # ensure indexes for users and "foaf:knows"-edges
-  # db.createIndex label:"User", property:"_id", (err) ->
-  #   db.createIndex "foaf:knows", ->
+  # ensure indexes for users and `knows`-edges
+  # db.createIndex label:"user", property:"_id", (err) ->
+  #   db.createIndex `knows`, ->
 
   console.log "Creating user graph with #{n} users"
   createSomeUsers n, k, p, (err, users) ->

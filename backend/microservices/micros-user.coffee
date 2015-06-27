@@ -16,74 +16,72 @@ user = (req, res, next) ->
   next req, res
 
 # expects:
-#   req.user
+#   req.user_id
 #   req.type
 # returns (example):
 #   interests: {
-#     'dc:keywords': [
-#       {name:'sun', likes:0.5},       # like interval 0..1
-#       {name:'sea', likes:0.4}        # sort by likes descending
+#     keyword: [
+#       {metadata_name:'sun', likes:0.5},  # like interval 0..1
+#       {metadata_name:'sea', likes:0.4}   # sort by likes descending
 #     ]
 #   }
 user.interests = (req, res, next) ->
   query =
     """
-    START User=node({userID})
-    MATCH (User)-[i:`foaf:interest`]->(Metadata)
-    WHERE (Metadata)<--(:#{req.type})
+    START user=node({user_id})
+    MATCH (user)-[i:interest]->(metadata)
+    WHERE (metadata)<--(:#{req.type})
       and i.like > 0
     RETURN
-      labels(Metadata)[0] AS metatype,
-      Metadata.name AS name,
+      labels(metadata)[0] AS metadata_type,
+      metadata.name AS metadata_name,
       i.like AS like,
       i.dislike AS dislikes
     ORDER BY like DESC;
     """
-  params = userID:req.user
+  params = user_id:req.user_id
   db.cypher query:query, params:params, (err, interests) ->
 
     # group by type of metadata (for now only `keyword` of `picture`)
     # and handle each type for its own
-    interests = _.groupBy interests, (interest) -> interest.metatype
-    for metatype, metataglist of interests
+    interests = _.groupBy interests, (interest) -> interest.metadata_type
+    for metadata_type, metadata_list of interests
 
       # calculate normalized interestlevel
-      max = metataglist[0].like * 1.0
+      max = metadata_list[0].like * 1.0
       max = 1.0 if max is 0
-      metataglist = _.map metataglist, (metatag) ->
+      metadata_list = _.map metadata_list, (metadata_item) ->
         # relevance dislikes
-        metatag.dislikes *= req.dislike_fac
+        metadata_item.dislikes *= req.dislike_fac
         # combine like and disklike
-        metatag.like = metatag.like * metatag.like / (metatag.like + metatag.dislikes)
+        metadata_item.like = metadata_item.like * metadata_item.like / (metadata_item.like + metadata_item.dislikes)
         # normalize
-        metatag.like /= max
+        metadata_item.like /= max
         # sanitize
-        delete metatag.metatype
-        delete metatag.dislikes
-        return metatag
+        delete metadata_item.metadata_type
+        delete metadata_item.dislikes
+        return metadata_item
 
       # sort and write back
-      metataglist = _.sortBy metataglist, (metatag) -> - metatag.like
-      metataglist = metataglist[0...50]
-      interests[metatype] = metataglist
+      metadata_list = _.sortBy metadata_list, (metadata_item) -> - metadata_item.like
+      metadata_list = metadata_list[0...50]
+      interests[metadata_type] = metadata_list
 
     req.interests = interests
     next req, res
 
-# The Friends from a user: req.user as a Scatter
+# The Friends from a user: req.user_id as a Scatter
 user.sfriends = (req, res, next) ->
-
-  console.log "User: ", req.user
   query =
     """
-    START User=node({userID})
-    MATCH (User)-[:`foaf:knows`]->(Friends)
+    START user=node({user_id})
+    MATCH (user)-[:knows]->(Friends)
     RETURN
       DISTINCT id(Friends) AS _id,
       Friends.firstName AS firstName,
       Friends.lastName AS lastName
     """
-  params = userID:req.user # todo: rename to user_id later
+  params = user_id:req.user_id
   db.cypher query:query, params:params, (err, friends) ->
     reqres = []
     if friends.length is 0
@@ -95,8 +93,8 @@ user.sfriends = (req, res, next) ->
     else
       for friend in friends
         nreq = _.clone req
-        nreq.current_user = nreq.user
-        nreq.user = friend._id
+        nreq.current_user_id = nreq.user_id
+        nreq.user_id = friend.friend_id
         nreq.firstName = friend.firstName
         nreq.lastName = friend.lastName
         reqres.push nreq
@@ -104,28 +102,28 @@ user.sfriends = (req, res, next) ->
     reqres.push res
     next.apply @, reqres
 
-# The Activities from a user: req.user
+# The Activities from a user: req.user_id
 user.activities = (req, res, next) ->
   query =
     """
-    START Friend=node({friend}), Current=node({user})
-    MATCH (Friend)-[like:`like`]->(Media:#{req.type})-[:metatag]->(Metatag)<-[interest:`foaf:interest`]-(Current)
-    WHERE not (Current)-[:`like`]->(Media)  // only media not yet clicked
-          and interest.like > 0             // only metatags matching current's interests
-          and (Current)-[:`foaf:interest`]->()<-[:metatag]-(Media)
+    START friend=node({friend_id}), user=node({user_id})
+    MATCH (friend)-[like:like]->(media:#{req.type})-[:metadata]->(metadata)<-[interest:interest]-(user)
+    WHERE
+      not (user)-[:like]->(media)  // only media that the user does not yet like
+      and interest.like > 0        // only metadata matching current's interests
     RETURN
-      id(Media) AS _id,
-      Media.title AS title,
-      Media.url AS url,
-      collect(Metatag.name) AS metatags,
+      id(media) AS _id,
+      media.title AS title,
+      media.url AS url,
+      collect(metadata.name) AS metadata_name,
       like.rating AS rating,
       like.updated AS updated
     ORDER BY updated DESC
     LIMIT 100
     """
   params =
-    friend:req.user
-    user:req.current_user
+    friend_id:req.user_id
+    user_id:req.current_user_id
   db.cypher query:query, params:params, (err, likes) ->
     # weight by last visit date
     amount = likes.length

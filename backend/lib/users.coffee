@@ -7,11 +7,11 @@ db = new neo4j.GraphDatabase 'http://neo4j:waynamic@localhost:7474'
 Users.all = (cb) ->
   query =
     """
-    MATCH (User:User)
+    MATCH (user:user)
     RETURN
-      id(User) AS _id,
-      User.firstName AS firstName,
-      User.lastName AS lastName
+      id(user) AS _id,
+      user.firstName AS firstName,
+      user.lastName AS lastName
     ORDER BY _id ASC
     LIMIT {limit};
     """
@@ -21,14 +21,14 @@ Users.all = (cb) ->
 Users.one = (_id, cb) ->
   query =
     """
-    START User = node({userID})
-    WHERE labels(User) = ['User']
+    START user = node({user_id})
+    WHERE labels(user) = ['user']
     RETURN
-      id(User) AS _id,
-      User.firstName AS firstName,
-      User.lastName AS lastName;
+      id(user) AS _id,
+      user.firstName AS firstName,
+      user.lastName AS lastName;
     """
-  params = userID:parseInt(_id)
+  params = user_id:parseInt(_id)
   db.cypher query:query, params: params, (err, result) ->
       if err
         console.log "ERROR in users.coffee Users.one: #{err.message}"
@@ -38,13 +38,15 @@ Users.one = (_id, cb) ->
 Users.history = (_id, type, cb) ->
   query =
     """
-    START User = node({userID})
-    WHERE labels(User) = ['User']
-    MATCH (User)-[like:`like`]->(Media:#{type})
-    RETURN id(Media) AS _id, Media.title AS title, Media.url AS url, like.updated AS updated
+    START user = node({user_id})
+    WHERE labels(user) = ['user']
+    MATCH (user)-[like:like]->(media:#{type})
+    RETURN
+      id(media) AS _id,
+      media.title AS title, media.url AS url, like.updated AS updated
     ORDER BY updated DESC;
     """
-  params = userID: parseInt(_id)
+  params = user_id: parseInt(_id)
   db.cypher query:query, params:params, (err, result) ->
     result = _.map result, (r) -> r.url = r.url.replace /\.jpg$/, '_s.jpg'; r
     cb err, result
@@ -53,12 +55,15 @@ Users.friends = (_id, cb) ->
   db.cypher
   query =
     """
-    START User=node({userID})
-    MATCH (User)-[:`foaf:knows`]->(Friends)
-    RETURN DISTINCT id(Friends) AS _id, Friends.firstName AS firstName, Friends.lastName AS lastName
+    START user=node({user_id})
+    MATCH (user)-[:knows]->(friends)
+    RETURN
+      DISTINCT id(friends) AS _id,
+      friends.firstName AS firstName,
+      friends.lastName AS lastName
     ORDER BY _id ASC;
     """
-  params = userID:parseInt(_id)
+  params = user_id:parseInt(_id)
   db.cypher query:query, params:params, cb
 
 

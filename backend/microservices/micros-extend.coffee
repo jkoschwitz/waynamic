@@ -16,20 +16,23 @@ extend = (req, res, next) ->
   req.count_cb += req.count_sb - res.length
   query =
     """
-    START User=node({user})
-    MATCH (User)-[i:`foaf:interest`]->(Metatag)<--(Mediaitem:#{req.type})
-    WHERE not (User)-[:`like`]->(Mediaitem)
-          and i.like > 0
-    WITH DISTINCT Mediaitem, sum(i.like * i.like / ({dislike_fac}*i.dislike + i.like)) AS interests
+    START user=node({user_id})
+    MATCH (user)-[i:interest]->()<--(media:#{req.type})
+    WHERE
+      not (user)-[:like]->(media)
+      and i.like > 0
+    WITH
+      DISTINCT media,
+      sum(i.like * i.like / ({dislike_fac}*i.dislike + i.like)) AS interests
     ORDER BY interests DESC
     RETURN
-      DISTINCT id(Mediaitem) AS _id,
-      Mediaitem.url AS url,
+      DISTINCT id(media) AS _id,
+      media.url AS url,
       'Passend zu Ihren Interessen' AS subtitle
     LIMIT {limit}
     """
   params =
-    user: req.current_user
+    user_id: req.current_user_id
     limit: req.count_cb
     dislike_fac: req.dislike_fac
   db.cypher query:query, params:params, (err, mediaitems) ->

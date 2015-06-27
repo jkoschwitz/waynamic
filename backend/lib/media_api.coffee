@@ -63,12 +63,12 @@ MediaApi.Flickr = (api_key) ->
     async.waterfall [
       ((cb) -> cb null, pic)
       , filter.correctness
-      , filter.picture       # >200ms/pic series == 99,9% of execution time
-      , filter.tags_censored
-      , filter.tags_synomity
-      , filter.tags_double
-      , filter.tags_useless
-      , filter.tags_count
+      , filter.picture_exists # >200ms/pic series == 99,9% of execution time
+      , filter.keywords_censored
+      , filter.keywords_synomity
+      , filter.keywords_double
+      , filter.keywords_useless
+      , filter.keywords_count
     ], cb
 
   filter.correctness = (pic, cb) ->
@@ -77,45 +77,45 @@ MediaApi.Flickr = (api_key) ->
       typeof pic.url is 'string' and
       typeof pic.title is 'string' and
       # /[\w]{2,}/.test pic.title and
-      pic.tags instanceof Array)
+      pic.keywords instanceof Array)
     return cb null, pic
 
-  filter.picture = (pic, cb) ->
+  filter.picture_exists = (pic, cb) ->
     https.head pic.url, (res) ->
       size = parseInt res.headers['content-length']
       # console.log "#{pic.url} | #{size} bytes"
       return cb new Error "FILTERED: picture is to small" unless size > 15000
       return cb null, pic
 
-  filter.tags_censored = (pic, cb) ->
-    censored = require '../data/tags_censored'
-    if (_.reduce pic.tags, ((memo, curr) -> memo or curr in censored), false)
+  filter.keywords_censored = (pic, cb) ->
+    censored = require '../data/keywords_censored'
+    if (_.reduce pic.keywords, ((memo, curr) -> memo or curr in censored), false)
       return cb new Error "FILTERED: picture contains explicit content"
     return cb null, pic
 
-  filter.tags_synomity = (pic, cb) ->
-    synomity = require '../data/tags_synomity'
-    pic.tags = _.map pic.tags, (tag) -> synomity[tag] or tag
+  filter.keywords_synomity = (pic, cb) ->
+    synomity = require '../data/keywords_synomity'
+    pic.keywords = _.map pic.keywords, (keyword) -> synomity[keyword] or keyword
     return cb null, pic
 
-  filter.tags_double = (pic, cb) ->
+  filter.keywords_double = (pic, cb) ->
     checker = {}
-    pic.tags = _.filter pic.tags, (tag) ->
-      return false if checker[tag]?
-      return checker[tag] = true
+    pic.keywords = _.filter pic.keywords, (keyword) ->
+      return false if checker[keyword]?
+      return checker[keyword] = true
     return cb null, pic
 
-  filter.tags_count = (pic, cb) ->
-    return cb new Error "FILTERED: too little tags" if pic.tags.length < 3
+  filter.keywords_useless = (pic, cb) ->
+    useless = require '../data/keywords_useless'
+    pic.keywords = _.filter pic.keywords, (keyword) ->
+      not (keyword in useless) and
+      not (/[\d\W]/.test keyword) and
+      not (keyword.length > 15) and
+      not (keyword.length < 3)
     return cb null, pic
 
-  filter.tags_useless = (pic, cb) ->
-    useless = require '../data/tags_useless'
-    pic.tags = _.filter pic.tags, (tag) ->
-      not (tag in useless) and
-      not (/[\d\W]/.test tag) and
-      not (tag.length > 15) and
-      not (tag.length < 3)
+  filter.keywords_count = (pic, cb) ->
+    return cb new Error "FILTERED: too little keywords" if pic.keywords.length < 3
     return cb null, pic
 
   # --- cache ------------------------------------------------------------------
@@ -123,14 +123,14 @@ MediaApi.Flickr = (api_key) ->
   # cached are hot pics from:   05.07.14 - 08.07.14
   Flickr.cache = (opts, cb) ->
     opts.limit ?= Infinity
-    pictures = require '../data/flickr_top'
+    pictures = require '../data/flickr_backup'
     return cb null, pictures[0...opts.limit]
 
   Flickr.cache.get_all = ->
-    JSON.readFileSync '../data/flickr_top.json'
+    JSON.readFileSync '../data/flickr_backup.json'
 
   Flickr.cache.write_all = (pictures) ->
-    JSON.writeFileSync '../data/flickr_top.json', pictures
+    JSON.writeFileSync '../data/flickr_backup.json', pictures
 
   Flickr.cache.count = ->
     Flickr.cache.get_all().length
@@ -141,7 +141,7 @@ MediaApi.Flickr = (api_key) ->
     new_pics = [new_pics] unless new_pics instanceof Array
     for new_pic in new_pics
       unless _.filter(pictures, (picture) -> picture.url is new_pic.url).length
-        pictures.unshift _.pick new_pic, 'url', 'title', 'tags'
+        pictures.unshift _.pick new_pic, 'url', 'title', 'keywords'
     console.log "         added new to cache: #{pictures.length-count}"
     Flickr.cache.write_all pictures
 
@@ -177,12 +177,12 @@ MediaApi.Flickr = (api_key) ->
   Flickr.find = (opts, cb) ->
     opts.limit ?= 1
     opts.keywords ?= []
-    tags = opts.keywords.join ','
-    get 'photos.search', per_page:500, tag_mode: 'AND', tags:tags, (err, result) ->
+    keywords = opts.keywords.join ','
+    get 'photos.search', per_page:500, keyword_mode: 'AND', keywords:keywords, (err, result) ->
       return cb err if err
       return cb null, [] if result.stat isnt 'ok' or opts.limit is 0
       result.photos.photo = _.shuffle result.photos.photo
-      collect err, result.photos.photo, opts.limit, tags, cb
+      collect err, result.photos.photo, opts.limit, keywords, cb
 
   collect = (err, data, limit, infostring, cb) ->
     pictures = []
@@ -219,7 +219,7 @@ MediaApi.Flickr = (api_key) ->
           return cb err if err
           return cb null,
             title: result.photo.title._content
-            tags: (obj._content for obj in result.photo.tags.tag when obj._content)
+            keywords: (obj._content for obj in result.photo.keywords.keyword when obj._content)
       , (err, all) ->
         return cb err if err
         return cb null, _.extend(all.sizes, all.info)

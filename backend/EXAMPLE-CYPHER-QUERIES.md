@@ -19,9 +19,6 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
     // Extensions
     :GET /db/data/ext
 
-    // REST API
-    :GET /db/data
-
 ## General
 
     // Get some data
@@ -44,6 +41,9 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
       count(r) AS count
     LIMIT 10
 
+    // REST API
+    :GET /db/data
+
 ## graph visualization
 
     // 10 users likes/dislikes
@@ -51,8 +51,8 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
     MATCH (user)-[r:like|dislike]->(media)
     RETURN user, media
 
-    // 10 pictures and its metainformation (limited)
-    MATCH (media:picture) WHERE rand()<0.1 WITH media LIMIT 10
+    // 10 media items and its metadata (limited)
+    MATCH (media:picture|music|movie|video) WHERE rand()<0.1 WITH media LIMIT 10
     MATCH (media)-[:metadata]->(metadata)
     RETURN media, metadata LIMIT 200
 
@@ -72,19 +72,19 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
     MATCH (picture:picture) WITH picture LIMIT 1000
     MATCH (picture)-->(keyword:keyword)
     RETURN
-      DISTINCT ID(picture) AS picture_id,
+      DISTINCT id(picture) AS picture_id,
       count(keyword) AS keywords
     ORDER BY keywords DESC
 
     // users - sorted by friend-count
     MATCH (user:user)
-    MATCH (user)-[:knows]->(friend)
+    MATCH (user)-[:knows]->(Friend)
     RETURN
-      DISTINCT ID(user) AS user_id,
-      count(friend) AS friends
-    ORDER BY friends DESC
+      DISTINCT id(user) AS user_id,
+      count(Friend) AS Friends
+    ORDER BY Friends DESC
 
-    // tags having the same picture
+    // keywords having the same picture
     MATCH (picture:picture) WHERE rand()<0.1
     WITH picture LIMIT 10
     MATCH (picture)-->(keyword:keyword)
@@ -93,11 +93,22 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
       count(picture) AS pictures
     ORDER BY pictures DESC
 
+## specific nodes (id required)
+
+    // one node by id
+    START node=node(203567)
+    RETURN node
+
+    // one user and picture
+    START picture = node(220255), user = node(203468)
+    MATCH (user)--(keyword:keyword)--(picture)
+    RETURN picture, user, keyword
+
 ## lists - interest
 
     // interest list of one user
-    //START user=node(1)
-    MATCH (user:user) WHERE rand() < 0.1 WITH user LIMIT 1
+    START user=node(1)
+    //MATCH (user:user) WHERE rand() < 0.1 WITH user LIMIT 1
     MATCH (user)-[i:interest]->(keyword:keyword)
     RETURN
       keyword.name AS keyword,
@@ -107,8 +118,8 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
     LIMIT 100
 
     // interest profile (not normalized)
-    //START user=node(1)
-    MATCH (user:user) WHERE rand() < 0.1 WITH user LIMIT 1
+    START user=node(1)
+    //MATCH (user:user) WHERE rand() < 0.1 WITH user LIMIT 1
     MATCH (user)-[i:interest]->(metadata)
     WHERE i.like > 0
     WITH
@@ -122,8 +133,8 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
     LIMIT 100
 
     // content based filtering
-    //START user=node(1)
-    MATCH (user:user) WHERE rand() < 0.1 WITH user LIMIT 1
+    START user=node(1)
+    //MATCH (user:user) WHERE rand() < 0.1 WITH user LIMIT 1
     MATCH (user)-[i:interest]->()<-[:metadata]-(media)
     WHERE
       not (user)-[:like]->(media)
@@ -140,6 +151,8 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
       interests AS interestlevel
     LIMIT 100
 
+
+
 ## manipulation
 
     // delete stuff made by mistake
@@ -149,14 +162,14 @@ run this commands in the [neo4j-browser](http://localhost:7474/browser/)
     OPTIONAL MATCH (x)-[r]-(a)
     DELETE r,x
 
-    // 1. delete (dis)likes, interests
+    // 1. delete all (dis)likes, interests
     MATCH (:user)-[r:like|dislike|interest]->()
     DELETE r
 
-    // 2. delete tags
+    // 2. delete all metadata
     MATCH ()-[metadata:metadata]->(metadata)
     DELETE metadata, metadata
 
-    // 3. delete pictures
+    // 3. delete all pictures
     MATCH (picture:picture)
     DELETE picture

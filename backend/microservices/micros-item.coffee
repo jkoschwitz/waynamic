@@ -19,7 +19,6 @@ item.aggregate = (reqs, ress, next) ->
   count_sb = reqs[0].count_sb
   for req in reqs
     for reco in req.recos
-      # console.log reco, req.user
       index = _.sortedIndex recommendations, reco, 'prediction'
       if index <= count_sb
         delete reco.item.rating
@@ -32,7 +31,7 @@ item.aggregate = (reqs, ress, next) ->
         unless stop
           # Add the friend information where the reco comes from
           reco.friend =
-            _id: req.user
+            friend_id: req.user_id
             firstName: req.firstName
             lastName: req.lastName
           # Adjust Recommendations
@@ -44,7 +43,7 @@ item.aggregate = (reqs, ress, next) ->
 
   # console.log recommendations
   req = reqs[0]
-  req.user = req.current_user
+  req.user_id = req.current_user_id
   delete req.firstName
   delete req.lastName
   delete req.recos
